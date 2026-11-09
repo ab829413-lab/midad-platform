@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة التحكم الإدارية للأكواد | مِداد</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 15px;
+      margin: 0;
+      line-height: 1.5;
+    }
+    .container { max-width: 650px; margin: 0 auto; }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 15px;
+    }
+    h1, h2 { color: #38bdf8; margin-top: 0; }
+    label { display: block; margin-top: 12px; font-weight: 600; font-size: 0.9rem; color: #cbd5e1; }
+    input, select, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 1rem;
+    }
+    button {
+      background: #0284c7;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 15px;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0369a1; }
+    .code-box {
+      background: #0369a1;
+      color: #ffffff;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      font-family: monospace;
+      font-size: 1.3rem;
+      font-weight: 800;
+      margin-top: 15px;
+      cursor: pointer;
+      border: 2px dashed #38bdf8;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+    th, td { border: 1px solid #334155; padding: 8px; text-align: right; }
+    th { background: #334155; color: #38bdf8; }
+    .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; }
+    .badge-active { background: #065f46; color: #34d399; }
+    .badge-empty { background: #881337; color: #fda4af; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>لوحة إدارة مِداد | MIDAD Control Center</h1>
+
+    <div class="card">
+      <label>رمز الدخول الإداري السري (ADMIN_SECRET_KEY):</label>
+      <input type="password" id="adminSecret" placeholder="أدخل كلمة المرور الإدارية">
+    </div>
+
+    <!-- توليد كود جديد -->
+    <div class="card">
+      <h2>توليد كود اشتراك جديد</h2>
+      
+      <label>عدد المهام المخصصة للكود (من 1 إلى 15 مهمة):</label>
+      <select id="taskCount">
+        <option value="1">مهمة واحدة (1)</option>
+        <option value="2">مهمتان (2)</option>
+        <option value="3">3 مهام</option>
+        <option value="4">4 مهام</option>
+        <option value="5" selected>5 مهام (الباقة الأكثر طلباً)</option>
+        <option value="6">6 مهام</option>
+        <option value="7">7 مهام</option>
+        <option value="8">8 مهام</option>
+        <option value="9">9 مهام</option>
+        <option value="10">10 مهام</option>
+        <option value="11">11 مهمة</option>
+        <option value="12">12 مهمة</option>
+        <option value="13">13 مهمة</option>
+        <option value="14">14 مهمة</option>
+        <option value="15">15 مهمة (الباقة الشاملة للدبلوم)</option>
+      </select>
+
+      <label>اسم الطالب أو الملاحظة:</label>
+      <input type="text" id="studentName" placeholder="مثال: المعلم عمر - مسار أثناء الخدمة">
+
+      <button onclick="generateNewCode()">توليد الكود الآن</button>
+
+      <div id="codeResultArea" style="display:none;">
+        <p style="text-align:center; font-size:0.85rem; color:#94a3b8; margin-top:15px; margin-bottom:5px;">
+          اضغط على الكود أدناه لنسخه وإرساله للطالب عبر واتساب:
+        </p>
+        <div id="codeDisplay" class="code-box" onclick="copyGeneratedCode()"></div>
+      </div>
+    </div>
+
+    <!-- سجل الأكواد الصادرة -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">سجل الأكواد وحالة الاستهلاك</h2>
+        <button onclick="loadCodesHistory()" style="width:auto; margin:0; padding:6px 12px; font-size:0.85rem;">تحديث القائمة</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>الكود</th>
+              <th>المهام (متبقي/أصلي)</th>
+              <th>المستفيد / ملاحظة</th>
+              <th>الحالة</th>
+            </tr>
+          </thead>
+          <tbody id="codesTableBody">
+            <tr><td colspan="4" style="text-align:center; color:#94a3b8;">اضغط تحديث القائمة لعرض الأكواد</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function generateNewCode() {
+      const adminKey = document.getElementById('adminSecret').value.trim();
+      if (!adminKey) return alert('يرجى إدخال رمز الدخول الإداري في الحقل الأول.');
+
+      const tasksCount = document.getElementById('taskCount').value;
+      const studentName = document.getElementById('studentName').value.trim();
+
+      try {
+        const res = await fetch('/api/admin/create-code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Key': adminKey
+          },
+          body: JSON.stringify({ tasksCount, studentName })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          document.getElementById('codeDisplay').innerText = data.codeData.code;
+          document.getElementById('codeResultArea').style.display = 'block';
+          loadCodesHistory();
+        } else {
+          alert(data.error || 'فشل توليد الكود.');
+        }
+      } catch (e) {
+        alert('تعذر الاتصال بالخادم.');
+      }
+    }
+
+    function copyGeneratedCode() {
+      const code = document.getElementById('codeDisplay').innerText;
+      navigator.clipboard.writeText(code);
+      alert('تم نسخ الكود بنجاح: ' + code);
+    }
+
+    async function loadCodesHistory() {
+      const adminKey = document.getElementById('adminSecret').value.trim();
+      if (!adminKey) return alert('أدخل الرمز الإداري أولاً.');
+
+      const tbody = document.getElementById('codesTableBody');
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">جاري الجلب...</td></tr>';
+
+      try {
+        const res = await fetch('/api/admin/list-codes', {
+          headers: { 'X-Admin-Key': adminKey }
+        });
+        const data = await res.json();
+        if (res.ok && data.codes) {
+          if (data.codes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد أكواد صادرة بعد.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = data.codes.map(c => `
+            <tr>
+              <td style="font-family:monospace; font-weight:bold;">${c.code}</td>
+              <td>${c.remainingTasks} من ${c.initialTasks}</td>
+              <td>${c.studentName || '-'}</td>
+              <td>
+                <span class="badge ${c.remainingTasks > 0 ? 'badge-active' : 'badge-empty'}">
+                  ${c.remainingTasks > 0 ? 'نشط' : 'مستهلك'}
+                </span>
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#ef4444;">${data.error || 'خطأ في جلب البيانات'}</td></tr>`;
+        }
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#ef4444;">تعذر الاتصال</td></tr>';
+      }
+    }
+  </script>
+</body>
+</html>

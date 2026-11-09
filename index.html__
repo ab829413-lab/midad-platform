@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مِداد | المساعد الأكاديمي والتربوي للدبلوم المهني</title>
+  <style>
+    :root {
+      --primary: #0f172a;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 12px;
+      line-height: 1.5;
+    }
+    .wrapper { max-width: 800px; margin: 0 auto; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    h1, h2, h3 { color: var(--primary); margin-top: 0; }
+    .brand-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    .badge {
+      background: #eff6ff;
+      color: var(--accent);
+      border: 1px solid #bfdbfe;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    label { font-weight: 600; font-size: 0.9rem; margin-top: 10px; display: block; }
+    input, select, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      margin-top: 6px;
+      font-family: inherit;
+    }
+    textarea { resize: vertical; }
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+      padding: 12px;
+      margin-top: 14px;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { background: var(--text-muted); cursor: not-allowed; }
+    .btn-wa {
+      background: #25D366;
+      color: white;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      margin-top: 10px;
+      text-align: center;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+    .hidden { display: none !important; }
+    .out-box {
+      background: #f1f5f9;
+      border-right: 4px solid var(--accent);
+      padding: 16px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+    .file-drop {
+      border: 2px dashed #cbd5e1;
+      padding: 14px;
+      border-radius: 8px;
+      text-align: center;
+      background: #f8fafc;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+    .file-drop.active { border-color: var(--accent); background: #eff6ff; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <!-- رأس الصفحة -->
+    <div class="brand-title">
+      <div>
+        <h1 style="font-size:1.4rem; margin:0;">مِداد | MIDAD</h1>
+        <span style="font-size:0.8rem; color:var(--text-muted);">المساعد الأكاديمي والتربوي الذكي لدبلوم إعداد المعلمين</span>
+      </div>
+      <div id="authStatusBadge" class="badge hidden">المهام المتبقية: <span id="tasksLeftNumber">0</span></div>
+    </div>
+
+    <!-- شاشة القفل وإدخال الكود -->
+    <div id="lockCard" class="card">
+      <h2>🔒 تفعيل الوصول إلى المنصة</h2>
+      <p style="color:var(--text-muted); font-size:0.9rem;">
+        منصة مِداد منصة أكاديمية مرخصة تعمل بنظام أكواد المهام المسبقة الدفع لضمان أعلى درجات الدقة والأمان.
+      </p>
+      
+      <label>أدخل كود الاشتراك الخاص بك:</label>
+      <input type="text" id="accessCode" placeholder="مثال: MID-5T-XXXXX" style="text-transform:uppercase; letter-spacing:1px; font-weight:700;">
+      
+      <button onclick="submitVerifyCode()" id="btnVerify">تفعيل الكود والبدء</button>
+      <div id="verifyErr" style="color:var(--danger); font-size:0.85rem; margin-top:8px;" class="hidden"></div>
+
+      <hr style="margin:20px 0; border:none; border-top:1px solid var(--border);">
+      <p style="text-align:center; font-size:0.9rem; margin-bottom:6px;">ليس لديك كود تفعيل بعد؟</p>
+      <a class="btn-wa" href="https://wa.me/962780821419?text=مرحبا،%20أريد%20شراء%20كود%20تفعيل%20لمنصة%20مداد%20التعليمية" target="_blank">
+        💬 تواصل للشراء عبر واتساب (+962780821419)
+      </a>
+    </div>
+
+    <!-- مساحة العمل الرئيسية بعد التفعيل -->
+    <div id="mainWorkspace" class="hidden">
+      <!-- اختيار المسار ونوع الأداة -->
+      <div class="card">
+        <div class="grid-2">
+          <div>
+            <label>مسار الدبلوم المهني:</label>
+            <select id="selTrack">
+              <option value="in" selected>أثناء الخدمة (In-Service: معلم ممارس)</option>
+              <option value="pre">قبل الخدمة (Pre-Service: متدرب ومدرسة متعاونة)</option>
+            </select>
+          </div>
+          <div>
+            <label>الأداة الأكاديمية المطلوبة:</label>
+            <select id="selMode">
+              <option value="draft_writer" selected>الكاتب الأكاديمي المفلتر (صياغة مسودة كاملة وموثقة)</option>
+              <option value="rubric_analysis">تحليل المهمة وتفكيك معايير الـ Rubric</option>
+              <option value="socratic_coach">المرشد التربوي السقراطي (مراجعة وتطوير بلا تزييف)</option>
+              <option value="originality_audit">مختبر فحص الأصالة والتدقيق الشامل</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- إدخال تفاصيل المهمة والملفات -->
+      <div class="card">
+        <label>تعليمات المهمة وموضوع الواجب:</label>
+        <textarea id="taskText" rows="4" placeholder="الصق نص تعليمات الواجب أو السؤال المطلوب هنا..."></textarea>
+
+        <label>معايير التقييم وسلّم التقدير (Rubric):</label>
+        <textarea id="rubricText" rows="3" placeholder="الصق معايير التقييم أو مستويات الأداء المطلوب بلوغها..."></textarea>
+
+        <label>الشواهد والبيانات الصفية الحقيقية (اختياري ولكنه موصى به):</label>
+        <textarea id="evidenceText" rows="2" placeholder="أرفق استراتيجيتك، موضوع الدرس، الصف، نتائج التقييم التكويني..."></textarea>
+
+        <label>📎 رفع صورة أو وثيقة الواجب الرسمية (PDF أو صورة ضوئية):</label>
+        <input type="file" id="fileUploader" accept="image/*,application/pdf">
+        <div id="fileInfoText" style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;"></div>
+
+        <button onclick="executeAcademicTask()" id="btnSubmitTask">إرسال للتنفيذ الأكاديمي (خصم مهمة واحدة)</button>
+        <div id="execStatus" style="font-size:0.85rem; color:var(--text-muted); margin-top:8px; text-align:center;" class="hidden"></div>
+      </div>
+
+      <!-- بطاقة عرض النتيجة والمراجع -->
+      <div id="resultCard" class="card hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h3 style="margin:0;">المخرجات الأكاديمية الرصينة:</h3>
+          <span id="modelBadge" class="badge" style="background:#fef3c7; color:#b45309; border-color:#fde68a;">Gemini Pro</span>
+        </div>
+        <div id="outputContainer" class="out-box"></div>
+        <button onclick="copyOutput()" style="background:#475569; margin-top:10px;">📋 نسخ المخرجات كاملة</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeToken = localStorage.getItem('midad_access_code') || '';
+    let uploadedBase64 = null;
+    let uploadedMime = null;
+
+    window.onload = () => {
+      if (activeToken) verifyTokenSilent(activeToken);
+
+      document.getElementById('fileUploader').addEventListener('change', handleFile);
+    };
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('fileInfoText').innerText = `تم اختيار: ${file.name} (${Math.round(file.size/1024)} KB)`;
+      
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const full = evt.target.result;
+        uploadedMime = full.split(';')[0].split(':')[1];
+        uploadedBase64 = full.split(',')[1];
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function submitVerifyCode() {
+      const code = document.getElementById('accessCode').value.trim();
+      const err = document.getElementById('verifyErr');
+      err.classList.add('hidden');
+      if (!code) return;
+
+      const btn = document.getElementById('btnVerify');
+      btn.innerText = 'جاري التحقق من الكود...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/verify-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (data.valid) {
+          activeToken = code;
+          localStorage.setItem('midad_access_code', code);
+          showWorkspace(data.remainingTasks);
+        } else {
+          err.innerText = data.error || 'الكود غير صحيح أو انتهى رصيده';
+          err.classList.remove('hidden');
+        }
+      } catch (e) {
+        err.innerText = 'تعذر الاتصال بالخادم. تحقق من الإنترنت.';
+        err.classList.remove('hidden');
+      } finally {
+        btn.innerText = 'تفعيل الكود والبدء';
+        btn.disabled = false;
+      }
+    }
+
+    async function verifyTokenSilent(code) {
+      try {
+        const res = await fetch('/api/verify-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (data.valid) showWorkspace(data.remainingTasks);
+      } catch (e) {}
+    }
+
+    function showWorkspace(remaining) {
+      document.getElementById('lockCard').classList.add('hidden');
+      document.getElementById('mainWorkspace').classList.remove('hidden');
+      document.getElementById('authStatusBadge').classList.remove('hidden');
+      document.getElementById('tasksLeftNumber').innerText = remaining;
+    }
+
+    async function executeAcademicTask() {
+      const taskInstructions = document.getElementById('taskText').value.trim();
+      const rubricText = document.getElementById('rubricText').value.trim();
+      const evidenceText = document.getElementById('evidenceText').value.trim();
+      const mode = document.getElementById('selMode').value;
+      const track = document.getElementById('selTrack').value;
+
+      if (!taskInstructions && !uploadedBase64) {
+        return alert('الرجاء إدخال نص المهمة أو رفع صورة/وثيقة الواجب للبدء.');
+      }
+
+      const btn = document.getElementById('btnSubmitTask');
+      const status = document.getElementById('execStatus');
+      btn.disabled = true;
+      status.innerText = 'جاري تحليل المهمة، جلب المراجع ذات الـ DOI، والتوليد الأكاديمي الصارم...';
+      status.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/midad-engine', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Access-Code': activeToken
+          },
+          body: JSON.stringify({
+            mode,
+            track,
+            taskInstructions,
+            rubricText,
+            evidenceText,
+            fileBase64: uploadedBase64,
+            fileMimeType: uploadedMime,
+            searchKeywords: taskInstructions.slice(0, 100)
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          document.getElementById('outputContainer').innerText = data.output;
+          document.getElementById('modelBadge').innerText = data.modelUsed;
+          document.getElementById('tasksLeftNumber').innerText = data.remainingTasks;
+          document.getElementById('resultCard').classList.remove('hidden');
+          status.innerText = 'اكتملت المعالجة الأكاديمية بنجاح.';
+        } else {
+          alert(data.error || 'حدث خطأ أثناء معالجة المهمة.');
+          status.classList.add('hidden');
+        }
+      } catch (e) {
+        alert('تعذر إكمال الاتصال بالخادم.');
+        status.classList.add('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function copyOutput() {
+      const txt = document.getElementById('outputContainer').innerText;
+      navigator.clipboard.writeText(txt);
+      alert('تم نسخ النص الأكاديمي كاملاً إلى الحافظة.');
+    }
+  </script>
+</body>
+</html>
