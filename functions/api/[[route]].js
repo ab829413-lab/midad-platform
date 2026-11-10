@@ -1,11 +1,6 @@
 /**
  * خادم مِداد المتطورة (MIDAD Pro Engine)
  * Cloudflare Pages Function (functions/api/[[route]].js)
- * متوافق مع:
- * - مفاتيح Gemini الحديثة (AQ.) والمفاتيح الكلاسيكية (AIzaSy) عبر ترويسة x-goog-api-key
- * - سلسلة نماذج ذكية: Gemini 2.5 Pro / Flash و 2.0 Flash و 1.5
- * - نظام أكواد المهام المسبقة الدفع (MIDAD_KV)
- * - البحث الأكاديمي المباشر عبر OpenAlex
  */
 
 export async function onRequest(context) {
@@ -16,7 +11,7 @@ export async function onRequest(context) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key, X-Admin-Key',
   };
 
   if (request.method === 'OPTIONS') {
@@ -29,18 +24,102 @@ export async function onRequest(context) {
   };
 
   try {
-    // 1. مسار التحقق من كود الطالب
-    if (path === '/api/verify-code' && request.method === 'POST') {
-      const { code } = await request.json();
+    const adminSecret = env.ADMIN_SECRET_KEY || 'AdelAdmin2026';
+
+    // 1. مسار لوحة الإدارة: توليد الأكواد
+    if ((path.endsWith('/api/admin/create-code') || path.endsWith('/api/admin/generate-code')) && request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const adminKey = request.headers.get('X-Admin-Key') || body.secretKey;
+
+      if (adminKey !== adminSecret) {
+        return new Response(JSON.stringify({ error: 'كلمة مرور الإدارة غير صحيحة.' }), { status: 401, headers: jsonHeaders });
+      }
+
+      const tasks = parseInt(body.tasksCount, 10);
+      if (isNaN(tasks) || tasks < 1 || tasks > 15) {
+        return new Response(JSON.stringify({ error: 'عدد المهام يجب أن يكون بين 1 و 15.' }), { status: 400, headers: jsonHeaders });
+      }
+
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let randomCode = `MID-${tasks}T-`;
+      for (let i = 0; i < 5; i++) {
+        randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      const codePayload = {
+        code: randomCode,
+        initialTasks: tasks,
+        totalTasks: tasks,
+        remainingTasks: tasks,
+        tasksRemaining: tasks,
+        studentName: body.studentName || 'طالب دبلوم',
+        track: body.track || 'عام',
+        notes: body.notes || '',
+        createdAt: new Date().toISOString(),
+        status: 'active'
+      };
+
+      if (env.MIDAD_KV) {
+        await env.MIDAD_KV.put(`code:${randomCode}`, JSON.stringify(codePayload));
+        let list = [];
+        const rawList = await env.MIDAD_KV.get('codes:index');
+        if (rawList) {
+          try { list = JSON.parse(rawList); } catch(e) {}
+        }
+        list.unshift(randomCode);
+        await env.MIDAD_KV.put('codes:index', JSON.stringify(list.slice(0, 200)));
+      }
+
+      return new Response(JSON.stringify({ success: true, codeData: codePayload }), { status: 200, headers: jsonHeaders });
+    }
+
+    // 2. مسار لوحة الإدارة: استعراض الأكواد
+    if (path.endsWith('/api/admin/list-codes')) {
+      let adminKey = request.headers.get('X-Admin-Key');
+      if (!adminKey && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        adminKey = body.secretKey;
+      }
+
+      if (adminKey !== adminSecret) {
+        return new Response(JSON.stringify({ error: 'غير مصرح لك بالدخول.' }), { status: 401, headers: jsonHeaders });
+      }
+
+      let codes = [];
+      if (env.MIDAD_KV) {
+        const rawList = await env.MIDAD_KV.get('codes:index');
+        if (rawList) {
+          try {
+            const list = JSON.parse(rawList);
+            for (const c of list) {
+              const raw = await env.MIDAD_KV.get(`code:${c}`);
+              if (raw) codes.push(JSON.parse(raw));
+            }
+          } catch(e) {}
+        } else {
+          const listRes = await env.MIDAD_KV.list({ prefix: 'code:' });
+          for (const k of listRes.keys) {
+            const raw = await env.MIDAD_KV.get(k.name);
+            if (raw) codes.push(JSON.parse(raw));
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ codes }), { status: 200, headers: jsonHeaders });
+    }
+
+    // 3. مسار التحقق من كود الطالب
+    if (path.endsWith('/api/verify-code') && request.method === 'POST') {
+      const { code } = await request.json().catch(() => ({}));
       if (!code) {
         return new Response(JSON.stringify({ error: 'يرجى إدخال كود التفعيل.' }), { status: 400, headers: jsonHeaders });
       }
 
-      const codeKey = `code:${code.trim().toUpperCase()}`;
+      const cleanCode = code.trim().toUpperCase();
       let codeData = null;
 
       if (env.MIDAD_KV) {
-        const raw = await env.MIDAD_KV.get(codeKey);
+        const raw = await env.MIDAD_KV.get(`code:${cleanCode}`);
         if (raw) codeData = JSON.parse(raw);
       }
 
@@ -48,78 +127,23 @@ export async function onRequest(context) {
         return new Response(JSON.stringify({ error: 'الكود المدخل غير صالح أو غير موجود.' }), { status: 404, headers: jsonHeaders });
       }
 
-      if (codeData.status === 'exhausted' || codeData.tasksRemaining <= 0) {
+      const remaining = codeData.remainingTasks !== undefined ? codeData.remainingTasks : codeData.tasksRemaining;
+      if (codeData.status === 'exhausted' || remaining <= 0) {
         return new Response(JSON.stringify({ error: 'تم استهلاك جميع المهام المخصصة لهذا الكود.' }), { status: 403, headers: jsonHeaders });
       }
 
       return new Response(JSON.stringify({
         valid: true,
-        tasksRemaining: codeData.tasksRemaining,
-        totalTasks: codeData.totalTasks,
+        tasksRemaining: remaining,
+        remainingTasks: remaining,
+        totalTasks: codeData.totalTasks || codeData.initialTasks,
         studentName: codeData.studentName || 'طالب مِداد',
       }), { status: 200, headers: jsonHeaders });
     }
 
-    // 2. مسار لوحة الإدارة: توليد الأكواد
-    if (path === '/api/admin/generate-code' && request.method === 'POST') {
-      const { secretKey, tasksCount, studentName } = await request.json();
-      const adminSecret = env.ADMIN_SECRET_KEY || 'AdelAdmin2026';
-
-      if (secretKey !== adminSecret) {
-        return new Response(JSON.stringify({ error: 'كلمة مرور الإدارة غير صحيحة.' }), { status: 401, headers: jsonHeaders });
-      }
-
-      const tasks = parseInt(tasksCount, 10);
-      if (isNaN(tasks) || tasks < 1 || tasks > 15) {
-        return new Response(JSON.stringify({ error: 'عدد المهام يجب أن يكون بين 1 و 15.' }), { status: 400, headers: jsonHeaders });
-      }
-
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let randomCode = 'MD-';
-      for (let i = 0; i < 8; i++) {
-        randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-
-      const codePayload = {
-        code: randomCode,
-        totalTasks: tasks,
-        tasksRemaining: tasks,
-        studentName: studentName || 'طالب دبلوم',
-        createdAt: new Date().toISOString(),
-        status: 'active'
-      };
-
-      if (env.MIDAD_KV) {
-        await env.MIDAD_KV.put(`code:${randomCode}`, JSON.stringify(codePayload));
-      }
-
-      return new Response(JSON.stringify({ success: true, codeData: codePayload }), { status: 200, headers: jsonHeaders });
-    }
-
-    // 3. مسار لوحة الإدارة: استعراض جميع الأكواد
-    if (path === '/api/admin/list-codes' && request.method === 'POST') {
-      const { secretKey } = await request.json();
-      const adminSecret = env.ADMIN_SECRET_KEY || 'AdelAdmin2026';
-
-      if (secretKey !== adminSecret) {
-        return new Response(JSON.stringify({ error: 'غير مصرح لك بالدخول.' }), { status: 401, headers: jsonHeaders });
-      }
-
-      let codes = [];
-      if (env.MIDAD_KV) {
-        const list = await env.MIDAD_KV.list({ prefix: 'code:' });
-        for (const k of list.keys) {
-          const raw = await env.MIDAD_KV.get(k.name);
-          if (raw) codes.push(JSON.parse(raw));
-        }
-      }
-
-      return new Response(JSON.stringify({ codes }), { status: 200, headers: jsonHeaders });
-    }
-
     // 4. مسار البحث الأكاديمي عبر OpenAlex
-    if (path === '/api/academic-search' && request.method === 'POST') {
-      const { query } = await request.json();
+    if ((path.endsWith('/api/academic-search') || path.endsWith('/api/references')) && request.method === 'POST') {
+      const { query } = await request.json().catch(() => ({}));
       if (!query) {
         return new Response(JSON.stringify({ error: 'يرجى تحديد مصطلح البحث.' }), { status: 400, headers: jsonHeaders });
       }
@@ -152,27 +176,27 @@ export async function onRequest(context) {
     }
 
     // 5. مسار تنفيذ مهام الدبلوم والذكاء الاصطناعي (Gemini Core)
-    if (path === '/api/execute-task' && request.method === 'POST') {
-      const { code, track, mode, taskPrompt, rubricData, fileBase64, mimeType } = await request.json();
+    if ((path.endsWith('/api/execute-task') || path.endsWith('/api/midad-engine')) && request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const { code, track, mode, taskPrompt, rubricData, fileBase64, mimeType } = body;
 
       const apiKey = env.GEMINI_API_KEY;
       if (!apiKey) {
         return new Response(JSON.stringify({ error: 'مفتاح GEMINI_API_KEY غير مضاف في إعدادات Cloudflare.' }), { status: 500, headers: jsonHeaders });
       }
 
-      // التحقق من الرصيد وخصم مهمة
-      const codeKey = `code:${(code || '').trim().toUpperCase()}`;
+      const cleanCode = (code || '').trim().toUpperCase();
       let codeRecord = null;
       if (env.MIDAD_KV) {
-        const raw = await env.MIDAD_KV.get(codeKey);
+        const raw = await env.MIDAD_KV.get(`code:${cleanCode}`);
         if (raw) codeRecord = JSON.parse(raw);
       }
 
-      if (!codeRecord || codeRecord.tasksRemaining <= 0) {
+      const rem = codeRecord ? (codeRecord.remainingTasks !== undefined ? codeRecord.remainingTasks : codeRecord.tasksRemaining) : 0;
+      if (!codeRecord || rem <= 0) {
         return new Response(JSON.stringify({ error: 'رصيد المهام لهذا الكود منتهٍ أو الكود غير صالح.' }), { status: 403, headers: jsonHeaders });
       }
 
-      // بناء موجه النظام الصارم المتخصص بالدبلوم
       let systemInstruction = `أنت منصة «مِداد | MIDAD» المساعد الأكاديمي والتربوي لطلبة الدبلوم المهني لإعداد المعلمين.
 أنت خبير تربوي معتمد في معايير أكاديمية الملكة رانيا، وتلتزم التزاماً صارماً بأخلاقيات البحث العلمي والأصالة:
 - المسار المختار: ${track === 'in_service' ? 'أثناء الخدمة (خبرة تدريسية وميدان حقيقي)' : 'قبل الخدمة (تدريب ميداني وتطبيق افتراضي مقنن)'}.
@@ -184,8 +208,9 @@ export async function onRequest(context) {
         systemInstruction += `\nمعايير التقييم (Rubric) الإلزامية:\n${rubricData}\n`;
       }
 
+      const promptText = taskPrompt || body.studentInput || '';
       const promptParts = [
-        { text: `${systemInstruction}\n\nالمهمة المطلوبة من الطالب:\n${taskPrompt}` }
+        { text: `${systemInstruction}\n\nالمهمة المطلوبة من الطالب:\n${promptText}` }
       ];
 
       if (fileBase64 && mimeType) {
@@ -197,7 +222,6 @@ export async function onRequest(context) {
         });
       }
 
-      // سلسلة النماذج الذكية حسب الأولوية
       const requestedPro = (mode === 'draft_writer' || fileBase64);
       const modelCandidates = requestedPro 
         ? ['gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro'] 
@@ -252,19 +276,25 @@ export async function onRequest(context) {
         }), { status: lastStatus, headers: jsonHeaders });
       }
 
-      // خصم مهمة بعد النجاح
       if (env.MIDAD_KV && codeRecord) {
-        codeRecord.tasksRemaining -= 1;
-        if (codeRecord.tasksRemaining <= 0) {
+        if (codeRecord.remainingTasks !== undefined) {
+          codeRecord.remainingTasks = Math.max(0, codeRecord.remainingTasks - 1);
+          codeRecord.tasksRemaining = codeRecord.remainingTasks;
+        } else {
+          codeRecord.tasksRemaining = Math.max(0, codeRecord.tasksRemaining - 1);
+          codeRecord.remainingTasks = codeRecord.tasksRemaining;
+        }
+        if (codeRecord.remainingTasks <= 0) {
           codeRecord.status = 'exhausted';
         }
-        await env.MIDAD_KV.put(codeKey, JSON.stringify(codeRecord));
+        await env.MIDAD_KV.put(`code:${cleanCode}`, JSON.stringify(codeRecord));
       }
 
       return new Response(JSON.stringify({
         success: true,
         output: generatedText,
-        tasksRemaining: codeRecord ? codeRecord.tasksRemaining : 0,
+        tasksRemaining: codeRecord ? codeRecord.remainingTasks : 0,
+        remainingTasks: codeRecord ? codeRecord.remainingTasks : 0,
         modelUsed: successfulModel || modelCandidates[0]
       }), { status: 200, headers: jsonHeaders });
     }
@@ -274,5 +304,5 @@ export async function onRequest(context) {
   } catch (err) {
     return new Response(JSON.stringify({ error: `حدث خطأ داخلي في الخادم: ${err.message}` }), { status: 500, headers: jsonHeaders });
   }
-    }
-          
+         }
+        
